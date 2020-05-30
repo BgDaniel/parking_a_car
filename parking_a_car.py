@@ -19,14 +19,14 @@ def M(q_1, q_2, q_dot_1, q_dot_2, phi, phi_dot):
     return q_dot_1 * math.cos(phi) - q_dot_2 * math.sin(phi) + phi_dot
 
 def L(q_1, q_2, q_dot_1, q_dot_2, phi, phi_dot):
-    return math.sqrt(2.0 * q_dot_1 * q_dot_1 + 2.0 * q_dot_2 * q_dot_2 + phi_dot * phi_dot /
-        + 2.0 * phi_dot * (q_dot_1 * math.cos(phi) - q_dot_2 * math.sin(phi)))
+    return math.sqrt(2.0 * q_dot_1 * q_dot_1 + 2.0 * q_dot_2 * q_dot_2 - phi_dot * phi_dot)
 
 class LagrangeEquation:
     def __init__(self, q_1_0, q_2_0, q_dot_1_0, q_dot_2_0, phi_0, length = 1.0, nbSteps = 5000):
         self._q_0 = np.array([q_1_0, q_2_0])
         self._q_dot_0 = np.array([q_dot_1_0, q_dot_2_0])
         self._phi_0 = phi_0
+        
         self._length = length
         self._nbSteps = nbSteps
         self._dt = length / float(nbSteps)
@@ -45,6 +45,8 @@ class LagrangeEquation:
         self._phi_dot_t[0] = - self._q_dot_1 * math.cos(self._phi_0) + self._q_dot_2 * math.sin(self._phi_0)
         self._phi_t[1] = self._phi_0 + self._dt * self._phi_dot_t[0]
 
+        self._lambda_t = np.zeros((nbSteps-2))
+
         self._p_t = np.zeros((nbSteps))
         # determine p_t[0] 
         self._p_t[0] = self._q_t[0] + np.array([math.sin(self._phi_0), math.cos(self._phi_0)])
@@ -55,20 +57,21 @@ class LagrangeEquation:
     def _M(self, i):
         return M(self._q_t[i][0], self._q_t[i][1], self._q_dot_t[i][0], self._q_dot_t[i][1], self._phi[i], self._phi_dot[i])
 
-    def _dLdq_1_t(self, i):
-        return .0
+    def _G(self, i):
+        return self._L(i) - self._lambda_t[i] * self._M(i)
 
-    def _next(self, i, q_dot_i_1, q_dot_i_2, lambda_i_minus_one):
-        self._q_dot_t[i] = np.array([q_dot_i_1, q_dot_i_2])
-        
-        # determine q_t_i_plus_one
-        self._q_t[i+1] = self._q_t[i+1] + self._dt * self._q_dot_t[i]
+    def _next(self, i, q_t_i, lambda_t_i_minus_two):
+        # determine q_t_i_minus_one
+        self._q_dot_t[i-1] = (q_t_i - self._q_t[i-1]) / self._dt
 
-        # determine phi_dot_i
-        self._phi_dot_t[i] = - self._q_dot_t[i][0] * math.cos(self._phi_t[i]) + self._q_dot_t[i][1] * math.sin(self._phi_t[i])
+        # determine phi_t_i_minus_one using M = 0
+        self._phi_dot_t[i-1] = - self._q_t[i-1][0] * math.cos(self._phi_t[i-1]) + self._q_t[i-1][1] * math.sin(self._phi_t[i-1])
 
-        # determine phi_i_plus_one
-        self._phi_t[i+1] = self._phi_t[i] + self._dt * self._phi_dot_t_[i]
+        # determine phi_t_i
+        self._phi_t[i] = self._phi_t[i-1] + self._dt * self._phi_dot_t[i-1]
+
+        # set lambda
+        self._lambda_t[i-2] = lambda_t_i_minus_two
 
     def solve(self):
         for t_i in range(1, self._length):
