@@ -1,11 +1,21 @@
-from parking_a_car import *
+import numpy as np
+from parking_car import ParkingCar
 
-q_1_0 = 1.0
-q_2_0 = 0.0
-q_dot_1_0 = 1.0
-q_dot_2_0 = 0.0
-phi_0 = 0.0
-lambda_0 = 1.0
+q_start = np.array([1.0, .0])
+q_end = np.array([3.0, 2.0])
+phi_start = .0
+phi_end = .0
 
-parkingCar = ParkingCar(q_1_0, q_2_0, q_dot_1_0, q_dot_2_0, phi_0, lambda_0)
+
+
+n = 101 # points in interval [0,1] to discretize y at
+L = 1.5
+x = np.arange(n) / float(n)
+print(x[1:])
+print(x[:-1])
+
+dx = x[1:] - x[:-1]
+
+parkingCar = ParkingCar(q_start, q_end, phi_start, phi_end)
 parkingCar.park()
+
