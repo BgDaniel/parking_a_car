@@ -58,20 +58,20 @@ class ParkingCar:
 
     # dG/dq_dot_1
     def _dG_dq_dot_1(self, i):
-        return 2.0 * self._q_dot_t[i][0] / self._L(i) + self._lambda_t[i] * math.cos(self._phi_t[i])
+        return (2.0 * self._q_dot_t[i][0] + self._phi_dot_t[i] * math.cos(self._phi_t[i])) / self._L(i) + self._lambda_t[i] * math.cos(self._phi_t[i])
 
     # dG/dq_dot_2
     def _dG_dq_dot_2(self, i):
-        return 2.0 * self._q_dot_t[i][1] / self._L(i) - self._lambda_t[i] * math.sin(self._phi_t[i])
+        return (2.0 * self._q_dot_t[i][1] - self._phi_dot_t[i] * math.sin(self._phi_t[i])) / self._L(i) - self._lambda_t[i] * math.sin(self._phi_t[i])
 
     # dG/dphi
     def _dG_dphi(self, i):
-        return - self._lambda_t[i] * (self._q_dot_t[i][0] * math.sin(self._phi_t[i]) \
-            - self._q_dot_t[i][1] * math.cos(self._phi_t[i]))
+        return - (self._phi_dot_t[i] / self._L(i) + self._lambda_t[i]) * (self._q_dot_t[i][0] * math.sin(self._phi_t[i]) \
+            + self._q_dot_t[i][1] * math.cos(self._phi_t[i]))
 
     # dG/dphi_dot
     def _dG_dphi_dot(self, i):
-        return - 2.0 * self._phi_dot_t[i] / self._L(i) + self._lambda_t[i]
+        return self._phi_dot_t[i] / self._L(i) + self._lambda_t[i]
 
 
     def _Lagrange(self, i, q_t_i_1, q_t_i_2, lambda_t_i_minus_one):
