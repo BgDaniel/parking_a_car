@@ -55,14 +55,12 @@ class ParkingCar:
         
         return np.add(np.subtract(cos_phi_q1, sin_phi_q2), phi[:-1])
 
-    def _dW(self, q1, q2, phi, eps=10^-5):
+    def _dW(self, q1, q2, phi, eps=10e-5):
         W = self._W(q1, q2, phi)
-        dW = np.zeros(self._nbSteps, self._nbSteps - 1)
+        dWjs = []
 
         for j, W_j in enumerate(W):
-            dWjdq1 = np.zeros(self._nbSteps)
-            dWjdq2= np.zeros(self._nbSteps)
-            dWjdphi = np.zeros(self._nbSteps)
+            dWj = np.zeros(3 * self._nbSteps)
             
             for i in range(0, self._nbSteps):
                 delta = np.zeros(self._nbSteps)
@@ -71,15 +69,13 @@ class ParkingCar:
                 q2_delta = np.add(q2, delta)
                 phi_delta = np.add(phi, delta)
 
-                dWjdq1[i] = (self._L(q1_delta, q2, phi) - W_j) / eps
-                dLdq2[i] = (self._L(q1, q2_delta, phi) - W_j) / eps
-                dLdphi[i] = (self._L(q1, q2, phi_delta) - W_j) / eps
+                dWj[i] = (self._W(q1_delta, q2, phi)[j] - W_j) / eps
+                dWj[i + self._nbSteps] = (self._W(q1, q2_delta, phi)[j] - W_j) / eps
+                dWj[i + 2 * self._nbSteps] = (self._W(q1, q2, phi_delta)[j] - W_j) / eps
 
-        return np.concatenate((dLdq1, dLdq2, dLdphi))
+            dWjs.append(dWj)
 
-
-        return dW
-
+        return np.column_stack(dWjs)
 
     def _dW_proj(self, q1, q2, phi):
         dW = self._dW(q1, q2, phi)
