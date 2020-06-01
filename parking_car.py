@@ -4,124 +4,98 @@ from numpy.linalg import inv
 import scipy.optimize as op
 
 class ParkingCar:
-    def __init__(self, q_start, q_end, phi_start, phi_end, nbSteps = 500):
+    def __init__(self, q_start, q_end, phi_start, phi_end, nbSteps = 100):
         self._nbSteps = nbSteps
-
-        self._q_1 = np.zeros((nbSteps))
-        self._q_2 = np.zeros((nbSteps))
-        self._phi = np.zeros((nbSteps))
-
-        self._q_1[0] = q_start[0]
-        self._q_1[-1] = q_end[0]
-        self._q_2[0] = q_start[1]
-        self._q_2[-1] = q_end[1]
-        self._phi[0] = phi_start
-        self._phi[-1] = phi_end
-
         self._q_start = q_start
         self._q_end = q_end
         self._phi_start = phi_start
         self._phi_end = phi_end
 
-    def _phi(self, i):
-        return self._phi[i]
+    def _L(self, q1, q2, phi):
+        dq1 = q1[1:] - q1[:-1]
+        dq2 = q2[1:] - q2[:-1]
+        dphi = phi[1:] - phi[:-1]
 
-    def _dq_1(self, i):
-        return self._q_1[i + 1] - self._q_1[i]
+        Lq = np.add(np.multiply(dq1, dq1), np.multiply(dq2, dq2))
 
-    def _dq_2(self, i):
-        return self._q_2[i + 1] - self._q_2[i]
+        H = 2.0 * np.multiply(dphi, np.multiply(dq1, np.cos(phi[:-1])) - np.multiply(dq2, np.sin(phi[:-1])))
+        Lp = np.sqrt(np.add(Lq, H))
+        Lq = np.sqrt(Lq)
 
-    def _dphi(self, i):
-        return self._phi[i + 1] - self._phi[i]
+        return Lq.sum() + Lp.sum()
 
-    def _dL(self, i):
-        return math.sqrt(2.0 * self._dq_1(i) * self._dq_1(i) + 2.0 * self._dq_2(i) * self._dq_2(i)  + self._dphi(i) * self._dphi(i) \
-            + 2.0 * self._dphi(i) * (self._dq_1(i) * math.cos(self._phi(i)) - self._dq_2(i) * math.sin(self._phi(i))))
+    def _dL(self, q1, q2, phi, eps=10e-6):
+        L = self._L(q1, q2, phi)
+        
+        dLdq1 = np.zeros(self._nbSteps)
+        dLdq2 = np.zeros(self._nbSteps)
+        dLdphi = np.zeros(self._nbSteps)
 
-    def _dL_dq_1(self, i):
-        if i == 1:
-            return - 1.0 / self._dL(1) * (2.0 * self._dq_1(1) + self._dphi(1) * math.cos(self._phi(1))) 
-        elif i == self._nbSteps:
-            return 1.0 / self._dL(self._nbSteps - 1) * (2.0 * self._dq_1(self._nbSteps - 1) + self._dphi(self._nbSteps - 1) * math.cos(self._phi(self._nbSteps - 1)))
-        else:
-            return - 1.0 / self._dL(i) * (2.0 * self._dq_1(i) + self._dphi(i) * math.cos(self._phi(i))) \
-                + 1.0 / self._dL(i-1) * (2.0 * self._dq_1(i - 1) + self._dphi(i - 1) * math.cos(self._phi(i - 1)))
+        for i in range(0, self._nbSteps):
+            delta = np.zeros(self._nbSteps)
+            delta[i] = eps
+            q1_delta = np.add(q1, delta)
+            q2_delta = np.add(q2, delta)
+            phi_delta = np.add(phi, delta)
 
-    def _dL_dq_1(self, i):
-        if i == 1:
-            return - 1.0 / self._dL(1) * (2.0 * self._dq_2(1) - self._dphi(1) * math.sin(self._phi(1))) 
-        elif i == self._nbSteps:
-            return 1.0 / self._dL(self._nbSteps - 1) * (2.0 * self._dq_2(self._nbSteps - 1) - self._dphi(self._nbSteps - 1) * math.sin(self._phi(self._nbSteps - 1)))
-        else:
-            return - 1.0 / self._dL(i) * (2.0 * self._dq_2(i) - self._dphi(i) * math.sin(self._phi(i))) \
-                + 1.0 / self._dL(i-1) * (2.0 * self._dq_2(i - 1) - self._dphi(i - 1) * math.sin(self._phi(i - 1)))
+            dLdq1[i] = (self._L(q1_delta, q2, phi) - L) / eps
+            dLdq2[i] = (self._L(q1, q2_delta, phi) - L) / eps
+            dLdphi[i] = (self._L(q1, q2, phi_delta) - L) / eps
 
-    
-    def _dL_dphi(self, i):
-        if i == 1:
-            return 1.0 / (2.0 * self._dL(1)) * (- 2.0 * self._dphi(1) - 2.0 * self._phi(1) * (self._dq_1(1) * math.cos(self._phi(1)) \
-                - self._dq_2(1) * math.sin(self._phi(1))) + 2.0 * self._dphi(1) * (- self._dq_1(1) * math.sin(self._phi(1)) - self._dq_2(1) * math.cos(self._phi(1))))
-        elif i == N:
-            return 1.0 / (2.0 * self._dL(self._nbSteps - 1)) * (2.0 * self._dphi(self._nbSteps - 1) + 2.0 * self._phi(self._nbSteps - 1) * (self._dq_1(self._nbSteps - 1) * math.cos(self._phi(self._nbSteps - 1)) \
-                    - self._dq_2(self._nbSteps - 1) * math.sin(self._phi(self._nbSteps - 1))))
-        else:
-            return 1.0 / (2.0 * self._dL(i)) * (- 2.0 * self._dphi(i) - 2.0 * self._phi(i) * (self._dq_1(i) * math.cos(self._phi(i)) \
-                - self._dq_2(i) * math.sin(self._phi(i)) + 2.0 * self._dphi(i) * (- self._dq_1(i) * math.sin(self._phi(i)) - self._dq_2(i) * math.cos(self._phi(i)))) \
-                + 1.0 / (2.0 * self._dL(i - 1)) * (2.0 * self._dphi(i - 1) + 2.0 * self._phi(i - 1) * (self._dq_1(i - 1) * math.cos(self._phi(i - 1)) - self._dq_2(i - 1) * math.sin(self._phi(i - 1)))))
+        return np.concatenate((dLdq1, dLdq2, dLdphi))
 
-    def _dL_dx(self):
-        for i in range(1,self._nbSteps):
-            dL_dx[i] = self._dL_dq_1(i)
-            dL_dx[self._nbSteps + i] = self._dL_dq_2(i)
-            dL_dx[2 * self._nbSteps + i] = self._dL_dphi(i)
+    def _W(self, q1, q2, phi):
+        W = np.zeros(self._nbSteps - 1)
+        
+        dq1 = q1[1:] - q1[:-1]
+        dq2 = q2[1:] - q2[:-1]
+        dphi = phi[1:] - phi[:-1]
+        cos_phi_q1 = np.multiply(dq1, np.cos(phi[:-1]))
+        sin_phi_q2 = np.multiply(dq2, np.sin(phi[:-1]))
+        
+        return np.add(np.subtract(cos_phi_q1, sin_phi_q2), phi[:-1])
 
-        return dL_dx
+    def _dW(self, q1, q2, phi, eps=10^-5):
+        W = self._W(q1, q2, phi)
+        dW = np.zeros(self._nbSteps, self._nbSteps - 1)
 
-    def _W(self):
-        W = np.zeros((3 * self._nbSteps, self._nbSteps - 1))
+        for j, W_j in enumerate(W):
+            dWjdq1 = np.zeros(self._nbSteps)
+            dWjdq2= np.zeros(self._nbSteps)
+            dWjdphi = np.zeros(self._nbSteps)
+            
+            for i in range(0, self._nbSteps):
+                delta = np.zeros(self._nbSteps)
+                delta[i] = eps
+                q1_delta = np.add(q1, delta)
+                q2_delta = np.add(q2, delta)
+                phi_delta = np.add(phi, delta)
 
-        for i in range(1, 3 * self._nbSteps):
-            for j in range(1, self._nbSteps - 1):
-                if 0 < i <= self._nbSteps:
-                    if i == j:
-                        W[i,j] = - math.cos(self._phi[i])
-                    elif i - 1 == j:
-                        W[i][j] = math.cos(self._phi[i])
-                if self._nbSteps < i <= 2 * self._nbSteps:
-                    if i - self._nbSteps == j:
-                        W[i][j] = math.sin(self._phi[i - self._nbSteps])
-                    elif i - self._nbSteps - 1 == j:
-                        W[i][j] = - math.sin(self._phi[i - self._nbSteps])
-                if 2 * self._nbSteps < i <= 3 * self._nbSteps:
-                    if i - 2 * self._nbSteps == j:
-                        W[i][j] = - 1.0 + math.sin(self._phi[i - 2 * self._nbSteps]) * (self._q_1[i - 2 * self._nbSteps+ 1] - self._q_1[i - 2 * self._nbSteps]) \
-                            - math.cos(self._phi[i - 2 * self._nbSteps]) * (self._q_2[i - 2 * self._nbSteps + 1] - self._q_2[i - 2 * self._nbSteps])
-                    elif i - 2 * self._nbSteps - 1 == j:
-                        W[i][j] = 1.0
+                dWjdq1[i] = (self._L(q1_delta, q2, phi) - W_j) / eps
+                dLdq2[i] = (self._L(q1, q2_delta, phi) - W_j) / eps
+                dLdphi[i] = (self._L(q1, q2, phi_delta) - W_j) / eps
 
-        return W
+        return np.concatenate((dLdq1, dLdq2, dLdphi))
 
-    def _projector_W(self):
-        W = self._W()
-        W_T = np.transpose(W)
-        return np.identity(self._n) - W * inv(W_T * W) * W_T
 
-    def _df_projected(self):
-        return self._projector_W() * self._dL_dx()
+        return dW
+
+
+    def _dW_proj(self, q1, q2, phi):
+        dW = self._dW(q1, q2, phi)
+        dW_T = np.transpose(dW)
+        return np.identity(self._nbSteps) - dW * inv(dW_T * dW) * dW_T
+
+    def _dL_proj(self, q1, q2, phi):
+        return self._dW_proj(q1, q2, phi) * self._dL(q1, q2, phi)
 
     def park(self):
-        q_1_0 = np.linspace(self._q_1[0], self._q_1[-1], num=self._nbSteps)
-        q_2_0 = np.linspace(self._q_2[0], self._q_2[-1], num=self._nbSteps)
-        phi_0 = np.linspace(self._phi[0], self._phi[-1], num=self._nbSteps)
-        x_0 = np.concatenate((q_1_0, q_2_0, phi_0))
+        q1_0 = np.linspace(self._q_start[0], self._q_end[0], num=self._nbSteps)
+        q2_0 = np.linspace(self._q_start[1], self._q_end[1], num=self._nbSteps)
+        phi_0 = np.linspace(self._phi_start, self._phi_end, num=self._nbSteps)
 
-        def _F(x):
-            for i in range(2, self._nbSteps - 2):
-                self._q_1[i] = x[i - 1]
-                self._q_2[i] = x[self._nbSteps - 2 + i - 1]
-                self._phi[i] = x[2 * self._nbSteps - 4 + i - 1]
+        dL = self._dL(q1_0, q2_0, phi_0)
 
-            return self._df_projected()
+        dL_proj = self._dL_proj(q1_0, q2_0, phi_0)
 
-        op.root(_F, x_0, method='lm', jac=None, tol=None, callback=None, options=None)    
+  
