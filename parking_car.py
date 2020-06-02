@@ -32,6 +32,10 @@ class ParkingCar:
         dLdphi = np.zeros(self._nbSteps)
 
         for i in range(0, self._nbSteps):
+            # do not shift first and last point as they are fixed (boundary conditions)
+            if i == 0 or i == self._nbSteps - 1:
+                continue
+
             delta = np.zeros(self._nbSteps)
             delta[i] = eps
             q1_delta = np.add(q1, delta)
@@ -63,6 +67,10 @@ class ParkingCar:
             dWj = np.zeros(3 * self._nbSteps)
             
             for i in range(0, self._nbSteps):
+                # do not shift first and last point as they are fixed (boundary conditions)
+                if i == 0 or i == self._nbSteps - 1:
+                    continue
+                
                 delta = np.zeros(self._nbSteps)
                 delta[i] = eps
                 q1_delta = np.add(q1, delta)
@@ -80,7 +88,7 @@ class ParkingCar:
     def _dW_proj(self, q1, q2, phi):
         dW = self._dW(q1, q2, phi)
         dW_T = np.transpose(dW)
-        return np.identity(self._nbSteps) - dW * inv(dW_T * dW) * dW_T
+        return np.identity(3 * self._nbSteps) - dW * inv(dW_T * dW) * dW_T
 
     def _dL_proj(self, q1, q2, phi):
         return self._dW_proj(q1, q2, phi) * self._dL(q1, q2, phi)
@@ -89,9 +97,22 @@ class ParkingCar:
         q1_0 = np.linspace(self._q_start[0], self._q_end[0], num=self._nbSteps)
         q2_0 = np.linspace(self._q_start[1], self._q_end[1], num=self._nbSteps)
         phi_0 = np.linspace(self._phi_start, self._phi_end, num=self._nbSteps)
+        x_0 = np.concatenate((q1_0, q2_0, phi_0))
 
-        dL = self._dL(q1_0, q2_0, phi_0)
+        def _G(x):
+            q1 = x[0:self._nbSteps - 2]
+            q1 = np.insert(q1, 0, self._q_start[0])
+            q1 = np.insert(q1, -1, self._q_end[0])
+            q2 = x[0:self._nbSteps - 2]
+            q2 = np.insert(q2, 0, self._q_start[1])
+            q2 = np.insert(q2, -1, self._q_end[1])
+            phi = x[0:self._nbSteps - 2]
+            phi = np.insert(q2, 0, self._phi_start)
+            phi = np.insert(q2, -1, self._phi_end)
+            return self._dL_proj(q1, q2, phi)
 
-        dL_proj = self._dL_proj(q1_0, q2_0, phi_0)
+        op.root(_G, x_0, method='lm', jac=None, tol=None, callback=None, options=None)
+
+
 
   
