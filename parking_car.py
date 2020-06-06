@@ -4,7 +4,7 @@ from numpy.linalg import inv
 import scipy.optimize as op
 
 class ParkingCar:
-    def __init__(self, q_start, q_end, phi_start, phi_end, nbSteps = 100):
+    def __init__(self, q_start, q_end, phi_start, phi_end, nbSteps = 30):
         self._nbSteps = nbSteps
         self._q_start = q_start
         self._q_end = q_end
@@ -18,13 +18,13 @@ class ParkingCar:
 
         Lq = np.add(np.multiply(dq1, dq1), np.multiply(dq2, dq2))
 
-        H = 2.0 * np.multiply(dphi, np.multiply(dq1, np.cos(phi[:-1])) - np.multiply(dq2, np.sin(phi[:-1])))
-        Lp = np.sqrt(np.add(Lq, H))
+        #H = 2.0 * np.multiply(dphi, np.multiply(dq1, np.cos(phi[:-1])) - np.multiply(dq2, np.sin(phi[:-1])))
+        #Lp = np.sqrt(np.add(Lq, H))
         Lq = np.sqrt(Lq)
 
-        return Lq.sum() + Lp.sum()
+        return Lq.sum() #+ Lp.sum()
 
-    def _dL(self, q1, q2, phi, eps=10e-6):
+    def _dL(self, q1, q2, phi, eps=10e-9):
         L = self._L(q1, q2, phi)
         
         dLdq1 = np.zeros(self._nbSteps)
@@ -59,7 +59,7 @@ class ParkingCar:
         
         return np.add(np.subtract(cos_phi_q1, sin_phi_q2), phi[:-1])
 
-    def _dW(self, q1, q2, phi, eps=10e-5):
+    def _dW(self, q1, q2, phi, eps=10e-9):
         W = self._W(q1, q2, phi)
         dWjs = []
 
@@ -88,30 +88,36 @@ class ParkingCar:
     def _dW_proj(self, q1, q2, phi):
         dW = self._dW(q1, q2, phi)
         dW_T = np.transpose(dW)
-        return np.identity(3 * self._nbSteps) - dW * inv(dW_T * dW) * dW_T
+        G = inv(np.dot(dW_T, dW))
+        H = np.dot(dW, G)
+        I = np.dot(H, dW_T)
+        return np.identity(3 * self._nbSteps) - I
 
     def _dL_proj(self, q1, q2, phi):
-        return self._dW_proj(q1, q2, phi) * self._dL(q1, q2, phi)
+        ret_val = np.dot(self._dW_proj(q1, q2, phi), self._dL(q1, q2, phi))
+        return ret_val
 
     def park(self):
         q1_0 = np.linspace(self._q_start[0], self._q_end[0], num=self._nbSteps)
         q2_0 = np.linspace(self._q_start[1], self._q_end[1], num=self._nbSteps)
         phi_0 = np.linspace(self._phi_start, self._phi_end, num=self._nbSteps)
         x_0 = np.concatenate((q1_0, q2_0, phi_0))
+        prod_dl = self._dL_proj(q1_0, q2_0, phi_0)
 
         def _G(x):
-            q1 = x[0:self._nbSteps - 2]
+            q1 = x[1:self._nbSteps - 1]
             q1 = np.insert(q1, 0, self._q_start[0])
-            q1 = np.insert(q1, -1, self._q_end[0])
-            q2 = x[0:self._nbSteps - 2]
+            q1 = np.insert(q1, len(q1), self._q_end[0])
+            q2 = x[self._nbSteps + 1:2 * self._nbSteps - 1]
             q2 = np.insert(q2, 0, self._q_start[1])
-            q2 = np.insert(q2, -1, self._q_end[1])
-            phi = x[0:self._nbSteps - 2]
-            phi = np.insert(q2, 0, self._phi_start)
-            phi = np.insert(q2, -1, self._phi_end)
+            q2 = np.insert(q2, len(q2), self._q_end[1])
+            phi = x[2 * self._nbSteps + 1:3 * self._nbSteps - 1]
+            phi = np.insert(phi, 0, self._phi_start)
+            phi = np.insert(phi, len(phi), self._phi_end)
             return self._dL_proj(q1, q2, phi)
 
-        op.root(_G, x_0, method='lm', jac=None, tol=None, callback=None, options=None)
+        sol = op.root(_G, x_0, method='lm', jac=None)
+        print(sol.x)
 
 
 
